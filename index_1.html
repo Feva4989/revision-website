@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Revision Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e14;
+    --panel:#121822;
+    --panel-2:#161e2b;
+    --line:#26313f;
+    --copper:#e8a33d;
+    --copper-dim:#8a662a;
+    --cyan:#4cc9f0;
+    --red:#ff5d5d;
+    --green:#3ddc84;
+    --text:#e6edf3;
+    --muted:#7b8794;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 20% 0%, #10192a 0%, transparent 45%),
+      radial-gradient(circle at 90% 100%, #10192a 0%, transparent 45%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'Space Mono',monospace;}
+  button{font-family:inherit;cursor:pointer;}
+  button:focus-visible, .chip:focus-visible, .option:focus-visible, .match-card:focus-visible{
+    outline:2px solid var(--cyan); outline-offset:2px;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+
+  /* ---------- shell ---------- */
+  .shell{max-width:760px;margin:0 auto;padding:20px 16px 60px;}
+  header.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  header.top h1{
+    font-family:'Space Mono',monospace; font-size:1.05rem; letter-spacing:0.5px;
+    margin:0; color:var(--copper); display:flex; align-items:center; gap:8px;
+  }
+  header.top h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);display:inline-block;}
+  .back-btn{
+    background:none;border:1px solid var(--line);color:var(--muted);
+    padding:6px 10px;border-radius:6px;font-size:0.75rem;font-family:'Space Mono',monospace;
+  }
+  .back-btn:hover{border-color:var(--copper);color:var(--copper);}
+
+  /* ---------- LED rail (signature element) ---------- */
+  .rail-wrap{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; margin-bottom:20px;
+  }
+  .rail-label{font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;}
+  .rail{display:flex; gap:6px; align-items:center;}
+  .rail-track{flex:1;height:2px;background:var(--line);position:relative;}
+  .led{
+    width:11px;height:11px;border-radius:50%;
+    background:#20293a; border:1px solid var(--line);
+    flex-shrink:0; position:relative; z-index:1;
+    transition:background .3s, box-shadow .3s;
+  }
+  .led.lit-amber{background:var(--copper); box-shadow:0 0 8px var(--copper);}
+  .led.lit-cyan{background:var(--cyan); box-shadow:0 0 9px var(--cyan);}
+
+  /* ---------- subject board ---------- */
+  .board-label{font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted);letter-spacing:1px;margin:4px 0 12px;text-transform:uppercase;}
+  .board{
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;
+  }
+  @media (min-width:520px){ .board{grid-template-columns:repeat(3,1fr);} }
+  .chip{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:14px 10px 12px; text-align:left; color:var(--text);
+    position:relative; transition:border-color .15s, transform .15s;
+  }
+  .chip:hover{border-color:var(--copper); transform:translateY(-2px);}
+  .chip .pins-top, .chip .pins-bot{display:flex;justify-content:space-evenly;position:absolute;left:8px;right:8px;}
+  .chip .pins-top{top:-4px;} .chip .pins-bot{bottom:-4px;}
+  .chip .pin{width:6px;height:6px;background:var(--line);border-radius:1px;}
+  .chip .swatch{width:22px;height:6px;border-radius:2px;margin-bottom:8px;}
+  .chip .rid{font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--muted);letter-spacing:0.5px;}
+  .chip .name{font-weight:600;font-size:0.88rem;margin-top:2px;line-height:1.25;}
+  .chip .stat{font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--muted);margin-top:8px;}
+
+  /* ---------- panels / mode select ---------- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;}
+  .subject-heading{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+  .subject-heading .swatch-lg{width:14px;height:32px;border-radius:3px;}
+  .subject-heading h2{margin:0;font-size:1.15rem;}
+  .subject-heading .sub{color:var(--muted);font-size:0.78rem;font-family:'Space Mono',monospace;}
+
+  .mode-list{display:flex;flex-direction:column;gap:10px;margin-top:14px;}
+  .mode-btn{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:14px; text-align:left; color:var(--text); display:flex; justify-content:space-between; align-items:center;
+  }
+  .mode-btn:hover{border-color:var(--cyan);}
+  .mode-btn .m-title{font-weight:600;font-size:0.92rem;}
+  .mode-btn .m-desc{color:var(--muted);font-size:0.76rem;margin-top:2px;}
+  .mode-btn .arrow{color:var(--copper);font-family:'Space Mono',monospace;}
+
+  .ai-row{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;}
+  .ai-btn{
+    background:none;border:1px dashed var(--copper-dim);color:var(--copper);
+    padding:8px 12px;border-radius:6px;font-size:0.75rem;font-family:'Space Mono',monospace;
+  }
+  .ai-btn:hover{border-style:solid;border-color:var(--copper);}
+  .ai-btn:disabled{opacity:0.5;cursor:default;}
+
+  /* ---------- quiz ---------- */
+  .hud{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--muted);}
+  .hud .score{color:var(--copper);}
+  .timer-bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:16px;}
+  .timer-fill{height:100%;background:var(--cyan);width:100%;transition:width 0.1s linear;}
+  .timer-fill.danger{background:var(--red);}
+  .q-text{font-size:1.02rem;line-height:1.5;margin-bottom:16px;min-height:2.6em;}
+  .q-topic{font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--copper-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+  .options{display:flex;flex-direction:column;gap:8px;}
+  .option{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:12px 14px;text-align:left;color:var(--text);font-size:0.9rem;
+  }
+  .option:hover:not(:disabled){border-color:var(--cyan);}
+  .option.correct{border-color:var(--green);background:rgba(61,220,132,0.1);}
+  .option.wrong{border-color:var(--red);background:rgba(255,93,93,0.1);}
+  .option:disabled{cursor:default;}
+  .feedback{margin-top:14px;font-size:0.85rem;color:var(--muted);min-height:1.2em;}
+  .next-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .btn{
+    background:var(--copper);color:#1a1206;border:none;border-radius:7px;
+    padding:10px 16px;font-weight:600;font-size:0.85rem;
+  }
+  .btn:hover{background:#f3b654;}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--text);}
+  .btn.ghost:hover{border-color:var(--copper);}
+  .btn:disabled{opacity:0.5;}
+
+  /* ---------- match game ---------- */
+  .match-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .match-card{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:10px 8px;min-height:76px;display:flex;align-items:center;justify-content:center;
+    text-align:center;font-size:0.78rem;line-height:1.3;color:var(--text);
+  }
+  .match-card.flipped{border-color:var(--cyan);}
+  .match-card.solved{border-color:var(--green);background:rgba(61,220,132,0.08);color:var(--muted);}
+  .match-card.shake{border-color:var(--red);}
+
+  /* ---------- results ---------- */
+  .results{text-align:center;padding:20px 0;}
+  .results .big{font-family:'Space Mono',monospace;font-size:2.4rem;color:var(--copper);}
+  .results .sub{color:var(--muted);margin-top:4px;}
+
+  /* ---------- AI panel ---------- */
+  .ai-box{
+    margin-top:14px;border:1px solid var(--copper-dim);border-radius:8px;
+    padding:12px 14px;background:rgba(232,163,61,0.06);font-size:0.85rem;line-height:1.5;
+  }
+  .ai-box .tag{font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--copper);letter-spacing:1px;display:block;margin-bottom:6px;}
+  .spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--copper-dim);border-top-color:var(--copper);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .lives{font-family:'Space Mono',monospace;color:var(--red);letter-spacing:2px;}
+</style>
+</head>
+<body>
+<div class="shell" id="app"></div>
+
+<script>
+/* ============================================================
+   DATA
+   ============================================================ */
+const RESISTOR_COLORS = ['#a0522d','#e63946','#f77f00','#ffd60a','#2ecc71','#4cc9f0','#9b5de5','#adb5bd','#f8f9fa','#5c9ded'];
+
+const SUBJECTS = [
+  {
+    id:'ma', name:'Mathematics', board:'OCR', color:RESISTOR_COLORS[0],
+    quiz:[
+      {q:'Simplify √50.', options:['5√2','2√5','10√5','25√2'], a:0, topic:'Surds'},
+      {q:'Write 3⁻² as a fraction.', options:['1/6','1/9','-9','9'], a:1, topic:'Indices'},
+      {q:'On a box plot, the box itself represents...', options:['The full range','The mode','The interquartile range','The mean'], a:2, topic:'Data'},
+      {q:'Cumulative frequency graphs are mainly used to estimate...', options:['The mode only','The median and quartiles','The range only','Standard deviation'], a:1, topic:'Data'},
+      {q:'Expand (x + 3)(x − 5).', options:['x² − 2x − 15','x² + 2x − 15','x² − 2x + 15','x² − 8x − 15'], a:0, topic:'Algebra'},
+      {q:'What is 8^(2/3)?', options:['2','4','16','64'], a:1, topic:'Indices'},
+      {q:'Solve x² − 5x + 6 = 0.', options:['x = 1 or 6','x = -2 or -3','x = 2 or 3','x = -2 or 3'], a:2, topic:'Algebra'},
+      {q:'Write 0.00042 in standard form.', options:['4.2 × 10⁴','4.2 × 10⁻⁴','42 × 10⁻⁵','0.42 × 10⁻³'], a:1, topic:'Standard form'}
+    ],
+    pairs:[
+      ['Surd','An irrational root, like √3'],
+      ['IQR','The range of the middle 50% of data'],
+      ['Standard form','Written as a × 10ⁿ'],
+      ['Quadratic','An equation with an x² term'],
+      ['Median','The middle value when data is ordered'],
+      ['Mode','The most frequent value']
+    ]
+  },
+  {
+    id:'el', name:'English Language', board:'AQA', color:RESISTOR_COLORS[1],
+    quiz:[
+      {q:'Which AQA paper usually focuses on fiction extracts?', options:['Paper 1','Paper 2','Both equally','Neither'], a:0, topic:'Exam structure'},
+      {q:'Repeating a word or phrase for emphasis is called...', options:['Anecdote','Repetition','Simile','Statistic'], a:1, topic:'Language techniques'},
+      {q:'Speaking directly to the reader using "you" is an example of...', options:['First person','Second person address','Passive voice','Alliteration'], a:1, topic:'Language techniques'},
+      {q:'Analysing structure means looking at...', options:['Just the vocabulary','How ideas are organised and shift across the text','Only the ending','The font used'], a:1, topic:'Structure'},
+      {q:'A rhetorical question is used to...', options:['Get a genuine answer','Make the reader think, with an obvious implied answer','Confuse the reader','Fill space'], a:1, topic:'Language techniques'},
+      {q:'One-sided, feeling-driven language used to persuade is called...', options:['Emotive language','Formal register','Statistical evidence','Direct quotation'], a:0, topic:'Persuasive writing'},
+      {q:'In Paper 2 Section B, you are usually asked to...', options:['Write a short story','Write to present a viewpoint, like an article or speech','Analyse a poem','Do a spelling test'], a:1, topic:'Exam structure'},
+      {q:'"Tone" in a piece of writing refers to...', options:['The word count','The writer\'s attitude shown through their word choices','The paragraph structure','The title'], a:1, topic:'Language techniques'}
+    ],
+    pairs:[
+      ['Emotive language','Words chosen to trigger a feeling'],
+      ['Rhetorical question','A question not needing a real answer'],
+      ['Anecdote','A short personal story used as evidence'],
+      ['Second person','Addressing the reader as "you"'],
+      ['Tone','The writer\'s attitude in the text'],
+      ['Viewpoint','The writer\'s stance on an issue']
+    ]
+  },
+  {
+    id:'lit', name:'English Literature', board:'AQA', color:RESISTOR_COLORS[2],
+    quiz:[
+      {q:'Which ghost shows Scrooge his lonely schooldays?', options:['Ghost of Christmas Present','Ghost of Christmas Past','Jacob Marley','Ghost of Christmas Yet to Come'], a:1, topic:'A Christmas Carol'},
+      {q:'Tiny Tim is used by Dickens mainly to highlight...', options:['The joy of wealth','The suffering of poor children under the Poor Law and workhouse system','Scrooge\'s business skill','Victorian fashion'], a:1, topic:'A Christmas Carol'},
+      {q:'Marley\'s chains are a symbol of...', options:['Freedom','The consequences of greed and selfishness in life','Christmas cheer','Family loyalty'], a:1, topic:'A Christmas Carol'},
+      {q:'In "Remains," the soldier is mainly haunted by...', options:['Homesickness','Guilt and the memory of the shooting','Boredom','Money worries'], a:1, topic:'Poetry'},
+      {q:'"War Photographer" contrasts war zones with home mainly using...', options:['Rhyme','Juxtaposition','Onomatopoeia','A happy ending'], a:1, topic:'Poetry'},
+      {q:'Scrooge\'s redemption critiques a theory that blamed poverty on overpopulation, known as...', options:['Malthusian theory','Darwinism','Utilitarianism','Marxism'], a:0, topic:'Context'},
+      {q:'"Remains" feels conversational partly because it is written as a...', options:['Sonnet','Dramatic monologue in colloquial language','Formal speech','List poem'], a:1, topic:'Poetry'},
+      {q:'The recurring motif of light in A Christmas Carol usually represents...', options:['Danger','Warmth, charity and redemption','Wealth only','Winter weather'], a:1, topic:'A Christmas Carol'}
+    ],
+    pairs:[
+      ['Ghost of Christmas Past','Shows Scrooge his own memories'],
+      ['Tiny Tim','Symbol of poor children\'s suffering'],
+      ['Marley\'s chains','Consequence of a life of greed'],
+      ['Juxtaposition','Contrasting ideas placed side by side'],
+      ['Dramatic monologue','A poem spoken by one character\'s voice'],
+      ['Malthusian theory','Blamed poverty on population growth']
+    ]
+  },
+  {
+    id:'bi', name:'Biology', board:'AQA', color:RESISTOR_COLORS[3],
+    quiz:[
+      {q:'Natural selection needs variation plus...', options:['A stable climate only','A heritable advantage that improves survival and reproduction','Human intervention','More predators'], a:1, topic:'Evolution'},
+      {q:'In a food chain, the arrow shows the direction of...', options:['Water flow','Energy transfer','Population growth','Time'], a:1, topic:'Ecosystems'},
+      {q:'Producers get their energy from...', options:['Eating other organisms','Sunlight, via photosynthesis','Decomposing matter','The soil directly'], a:1, topic:'Ecosystems'},
+      {q:'Homeostasis means...', options:['Rapid growth','Maintaining a stable internal environment','Cell division','Genetic mutation'], a:1, topic:'Cells & systems'},
+      {q:'Aerobic respiration reacts glucose with...', options:['Nitrogen','Oxygen','Carbon monoxide','Hydrogen'], a:1, topic:'Cells & systems'},
+      {q:'A species\' "niche" refers to...', options:['Its exact location on a map','Its role and position within its ecosystem','Its size','Its lifespan'], a:1, topic:'Ecosystems'},
+      {q:'A mutation giving a survival advantage tends to become more common due to...', options:['Genetic drift only','Natural selection','Random chance alone','Migration'], a:1, topic:'Evolution'},
+      {q:'Decomposers in a food chain mainly...', options:['Produce oxygen','Break down dead matter and recycle nutrients','Hunt live prey','Photosynthesise'], a:1, topic:'Ecosystems'}
+    ],
+    pairs:[
+      ['Natural selection','Survival of the best-adapted organisms'],
+      ['Producer','Makes its own food using sunlight'],
+      ['Homeostasis','Keeping internal conditions stable'],
+      ['Aerobic respiration','Oxygen + glucose releases energy'],
+      ['Niche','A species\' role within its habitat'],
+      ['Decomposer','Breaks down dead organic matter']
+    ]
+  },
+  {
+    id:'ch', name:'Chemistry', board:'AQA', color:RESISTOR_COLORS[4],
+    quiz:[
+      {q:'Acid + alkali → salt + ?', options:['Oxygen','Water','Carbon dioxide','Hydrogen'], a:1, topic:'Neutralisation'},
+      {q:'What ion do all acids release in water?', options:['OH⁻','H⁺','Na⁺','Cl⁻'], a:1, topic:'Neutralisation'},
+      {q:'In a neutralisation reaction, pH moves toward...', options:['0','7','14','It doesn\'t change'], a:1, topic:'Neutralisation'},
+      {q:'What test confirms carbon dioxide gas?', options:['It turns limewater cloudy','It pops with a lit splint','It relights a glowing splint','It smells sweet'], a:0, topic:'Tests & reactions'},
+      {q:'Which factor speeds up a reaction rate?', options:['Lowering temperature','Increasing surface area','Removing the catalyst','Lowering concentration'], a:1, topic:'Rates of reaction'},
+      {q:'The nucleus of an atom contains...', options:['Electrons only','Protons and neutrons','Neutrons only','Protons and electrons'], a:1, topic:'Atomic structure'},
+      {q:'Ionic bonding involves...', options:['Sharing electrons','Transferring electrons','Sharing protons','Losing neutrons'], a:1, topic:'Bonding'},
+      {q:'Covalent bonding involves...', options:['Transferring electrons','Sharing electrons','Transferring protons','Losing neutrons'], a:1, topic:'Bonding'}
+    ],
+    pairs:[
+      ['Neutralisation','Acid + alkali → salt + water'],
+      ['Ionic bond','Formed by transferring electrons'],
+      ['Covalent bond','Formed by sharing electrons'],
+      ['Catalyst','Speeds up a reaction, unchanged itself'],
+      ['Exothermic','A reaction that releases heat'],
+      ['Endothermic','A reaction that absorbs heat']
+    ]
+  },
+  {
+    id:'ph', name:'Physics', board:'AQA', color:RESISTOR_COLORS[5],
+    quiz:[
+      {q:'Resultant force = mass × ?', options:['Velocity','Acceleration','Distance','Time'], a:1, topic:'Forces'},
+      {q:'The unit of energy is the...', options:['Newton','Watt','Joule','Volt'], a:2, topic:'Energy'},
+      {q:'Which type of wave can travel through a vacuum?', options:['Sound wave','Electromagnetic wave','Seismic wave','Water wave'], a:1, topic:'Waves'},
+      {q:'Current = voltage ÷ ?', options:['Power','Resistance','Time','Charge'], a:1, topic:'Electricity'},
+      {q:'The force that opposes motion between two surfaces is...', options:['Gravity','Friction','Tension','Thrust'], a:1, topic:'Forces'},
+      {q:'Which is a renewable energy source?', options:['Coal','Natural gas','Wind','Oil'], a:2, topic:'Energy'},
+      {q:'Momentum = mass × ?', options:['Acceleration','Velocity','Force','Time'], a:1, topic:'Forces'},
+      {q:'Static electricity usually builds up due to...', options:['Transfer of electrons through friction','Transfer of protons','Magnetic fields only','Heat alone'], a:0, topic:'Electricity'}
+    ],
+    pairs:[
+      ['F = ma','Newton\'s second law of motion'],
+      ['Momentum','Mass multiplied by velocity'],
+      ['Friction','A force that resists motion'],
+      ['V = IR','Ohm\'s law'],
+      ['Renewable energy','A naturally replenished energy source'],
+      ['Static electricity','Charge build-up from friction']
+    ]
+  },
+  {
+    id:'re', name:'Religious Studies', board:'WJEC Eduqas', color:RESISTOR_COLORS[6],
+    quiz:[
+      {q:'The belief that God exists as three persons in one is called the...', options:['Trinity','Incarnation','Resurrection','Covenant'], a:0, topic:'Christian beliefs'},
+      {q:'The Catholic sacrament of reconciliation is also known as...', options:['Baptism','Confession','Confirmation','Communion'], a:1, topic:'Practices'},
+      {q:'Utilitarian ethics judges an action mainly by...', options:['The intention behind it','Its outcome, aiming for the greatest happiness for the most people','Religious law alone','Personal preference'], a:1, topic:'Ethics'},
+      {q:'"Sanctity of life" is the belief that...', options:['Only some lives matter','Life is sacred and given by God','Life has no value','Animals matter more than humans'], a:1, topic:'Ethics'},
+      {q:'Just war theory is used to assess...', options:['Whether a war is morally justified','Battle tactics','Weapon design','Trade agreements'], a:0, topic:'Ethics'},
+      {q:'"Agape" in Christian ethics means...', options:['Romantic love','Unconditional, selfless love','Family loyalty only','Fear of God'], a:1, topic:'Christian beliefs'},
+      {q:'"Omnipotent" describes a God who is...', options:['All-knowing','All-powerful','Ever-present','Unchanging'], a:1, topic:'Christian beliefs'},
+      {q:'A common purpose of prayer in Christianity is...', options:['Communication with God','Entertainment','Passing time','Physical exercise'], a:0, topic:'Practices'}
+    ],
+    pairs:[
+      ['Trinity','Father, Son and Holy Spirit as one God'],
+      ['Agape','Unconditional, selfless love'],
+      ['Just war theory','Rules for judging if war is justified'],
+      ['Sanctity of life','Belief that life is sacred'],
+      ['Omnipotent','All-powerful'],
+      ['Reconciliation','The sacrament of confession']
+    ]
+  },
+  {
+    id:'en', name:'Engineering Design', board:'NCFE', color:RESISTOR_COLORS[7],
+    quiz:[
+      {q:'Which shape is strongest in compression and common in bridge trusses?', options:['Square','Triangle','Circle','Pentagon'], a:1, topic:'Structures'},
+      {q:'Tension and compression forces differ because...', options:['Tension pushes, compression pulls','Tension pulls/stretches, compression pushes/squeezes','They\'re the same force','Neither acts on structures'], a:1, topic:'Structures'},
+      {q:'Which property matters most when picking a bridge material?', options:['Colour','Strength and stiffness','Smell','Cost only'], a:1, topic:'Materials'},
+      {q:'In structural engineering, a "load" is...', options:['A type of material','A force acting on a structure','A design sketch','A safety certificate'], a:1, topic:'Structures'},
+      {q:'After identifying a design need, the next step is usually...', options:['Manufacturing the final product','Research and writing a specification','Marketing the product','Recycling old designs'], a:1, topic:'Design process'},
+      {q:'Which process shapes metal by melting it and pouring into a mould?', options:['Casting','Welding','Sawing','Sanding'], a:0, topic:'Manufacturing'},
+      {q:'A prototype is mainly used to...', options:['Sell to customers immediately','Test and refine a design before final production','Replace the specification','Advertise the brand'], a:1, topic:'Design process'},
+      {q:'Which material is commonly used for bridge decks?', options:['Glass','Steel or reinforced concrete','Paper','Rubber'], a:1, topic:'Materials'}
+    ],
+    pairs:[
+      ['Truss','A triangular support structure'],
+      ['Tension','A stretching force'],
+      ['Compression','A squeezing force'],
+      ['Prototype','A test version of a design'],
+      ['Casting','Shaping metal using a mould'],
+      ['Load','A force acting on a structure']
+    ]
+  },
+  {
+    id:'ge', name:'Geography B', board:'Pearson', color:RESISTOR_COLORS[8],
+    quiz:[
+      {q:'Earthquakes at plate boundaries happen when...', options:['Plates merge permanently','Built-up stress is released along a fault as plates move','The atmosphere cools','Volcanoes stop erupting'], a:1, topic:'Tectonic hazards'},
+      {q:'Which is a type of plate boundary?', options:['Destructive','Circular','Vertical','Elastic'], a:0, topic:'Tectonic hazards'},
+      {q:'The Richter/moment magnitude scale measures...', options:['Wind speed','Earthquake size','Rainfall','Volcanic ash height'], a:1, topic:'Tectonic hazards'},
+      {q:'Tsunamis are most commonly caused by...', options:['Heavy rainfall','Underwater earthquakes displacing water','Strong winds','Melting glaciers'], a:1, topic:'Tectonic hazards'},
+      {q:'A good way to reduce earthquake damage is...', options:['Ignoring building codes','Earthquake-resistant building design','Building only in valleys','Removing early warning systems'], a:1, topic:'Tectonic hazards'},
+      {q:'Shield volcanoes are known for...', options:['Steep slopes and explosive eruptions','Gentle slopes and runny, effusive lava','No lava at all','Freezing temperatures'], a:1, topic:'Tectonic hazards'},
+      {q:'A primary effect of a hazard is...', options:['A long-term knock-on impact','The immediate, direct impact','Always economic','Always positive'], a:1, topic:'Tectonic hazards'},
+      {q:'LICs often suffer more hazard deaths than HICs mainly because of...', options:['Better building standards','Less money for preparation and response','Fewer people living there','Milder hazards'], a:1, topic:'Tectonic hazards'}
+    ],
+    pairs:[
+      ['Fault','A crack where tectonic plates move'],
+      ['Tsunami','A wave caused by an underwater quake'],
+      ['Magnitude','The size of an earthquake'],
+      ['Shield volcano','Gentle slopes, runny lava'],
+      ['Primary effect','The immediate impact of a hazard'],
+      ['LIC','Lower income country, often less hazard-ready']
+    ]
+  },
+  {
+    id:'cs', name:'Computer Science', board:'OCR', color:RESISTOR_COLORS[9],
+    quiz:[
+      {q:'Worst-case time complexity of bubble sort is...', options:['O(n)','O(log n)','O(n²)','O(1)'], a:2, topic:'Algorithms'},
+      {q:'A Caesar cipher encrypts by...', options:['Reversing the message','Shifting each letter by a fixed number of places','Deleting vowels','Adding random symbols'], a:1, topic:'Security'},
+      {q:'Binary search requires the data to first be...', options:['Sorted','Encrypted','Duplicated','Reversed'], a:0, topic:'Algorithms'},
+      {q:'Which layer handles routing between networks?', options:['Application layer','Network layer','Physical layer','Session layer'], a:1, topic:'Networking'},
+      {q:'In SQL, which keyword filters rows?', options:['SELECT','FROM','WHERE','ORDER BY'], a:2, topic:'Databases'},
+      {q:'What is binary 1010 in denary?', options:['8','9','10','12'], a:2, topic:'Data representation'},
+      {q:'Which logic gate outputs true only if both inputs are true?', options:['OR','NOT','AND','XOR'], a:2, topic:'Logic'},
+      {q:'A MAC address is used to...', options:['Encrypt data','Uniquely identify a device\'s network hardware','Store a webpage','Compress files'], a:1, topic:'Networking'}
+    ],
+    pairs:[
+      ['Bubble sort','Repeatedly swaps adjacent items'],
+      ['Caesar cipher','Shifts letters by a fixed number'],
+      ['Binary search','Halves a sorted list each check'],
+      ['MAC address','Unique ID for network hardware'],
+      ['AND gate','True only if both inputs are true'],
+      ['WHERE','SQL keyword that filters rows']
+    ]
+  }
+];
+
+/* ============================================================
+   STATE (in-memory only, resets on reload)
+   ============================================================ */
+const state = {
+  screen:'home',
+  subjectId:null,
+  mode:null,
+  progress:{}, // subjectId -> {attempted, correct}
+  extraQuestions:{}, // subjectId -> [] AI-generated additions this session
+  quiz:{list:[], i:0, score:0, streak:0, timer:null, timeLeft:0, answered:false},
+  survival:{list:[], i:0, lives:3, score:0, timer:null, timeLeft:0, answered:false},
+  match:{cards:[], first:null, solvedCount:0, tries:0}
+};
+SUBJECTS.forEach(s=>state.progress[s.id]={attempted:0,correct:0});
+
+function subjectById(id){ return SUBJECTS.find(s=>s.id===id); }
+function allQuiz(s){ return s.quiz.concat(state.extraQuestions[s.id]||[]); }
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = header() + body();
+}
+
+function header(){
+  return `
+    <header class="top">
+      <h1><span class="dot"></span> The Revision Board</h1>
+      ${state.screen!=='home' ? `<button class="back-btn" onclick="goHome()">← BOARD</button>` : ''}
+    </header>
+  `;
+}
+
+function body(){
+  if(state.screen==='home') return homeScreen();
+  if(state.screen==='mode') return modeScreen();
+  if(state.screen==='quiz') return quizScreen();
+  if(state.screen==='survival') return survivalScreen();
+  if(state.screen==='match') return matchScreen();
+  if(state.screen==='results') return resultsScreen();
+  return '';
+}
+
+function homeScreen(){
+  const leds = SUBJECTS.map(s=>{
+    const p = state.progress[s.id];
+    let cls='';
+    if(p.attempted>0){
+      cls = (p.correct/p.attempted>=0.8) ? 'lit-cyan' : 'lit-amber';
+    }
+    return `<div class="led ${cls}" title="${s.name}"></div>`;
+  }).join('');
+
+  const chips = SUBJECTS.map((s,idx)=>{
+    const p = state.progress[s.id];
+    const statTxt = p.attempted>0 ? `${p.correct}/${p.attempted} correct` : 'not played yet';
+    return `
+      <button class="chip" onclick="openSubject('${s.id}')">
+        <div class="pins-top">${'<div class=\"pin\"></div>'.repeat(4)}</div>
+        <div class="swatch" style="background:${s.color}"></div>
+        <div class="rid mono">R${String(idx+1).padStart(2,'0')} · ${s.board}</div>
+        <div class="name">${s.name}</div>
+        <div class="stat mono">${statTxt}</div>
+        <div class="pins-bot">${'<div class=\"pin\"></div>'.repeat(4)}</div>
+      </button>
+    `;
+  }).join('');
+
+  return `
+    <div class="rail-wrap">
+      <div class="rail-label mono">Progress rail — lights up as you revise</div>
+      <div class="rail">${leds}</div>
+    </div>
+    <div class="board-label mono">10 modules on the board — tap one to power it up</div>
+    <div class="board">${chips}</div>
+  `;
+}
+
+function modeScreen(){
+  const s = subjectById(state.subjectId);
+  const extra = state.extraQuestions[s.id] ? state.extraQuestions[s.id].length : 0;
+  return `
+    <div class="panel">
+      <div class="subject-heading">
+        <div class="swatch-lg" style="background:${s.color}"></div>
+        <div>
+          <h2>${s.name}</h2>
+          <div class="sub mono">${s.board} · ${s.quiz.length + extra} questions loaded</div>
+        </div>
+      </div>
+      <div class="mode-list">
+        <button class="mode-btn" onclick="startQuiz()">
+          <div><div class="m-title">Quiz Blitz</div><div class="m-desc">Multiple choice, 20 seconds a question, streak bonus</div></div>
+          <div class="arrow">▶</div>
+        </button>
+        <button class="mode-btn" onclick="startSurvival()">
+          <div><div class="m-title">Survival</div><div class="m-desc">3 lives, questions get faster, one wrong answer costs a life</div></div>
+          <div class="arrow">▶</div>
+        </button>
+        <button class="mode-btn" onclick="startMatch()">
+          <div><div class="m-title">Match-Up</div><div class="m-desc">Flip cards, pair terms with definitions</div></div>
+          <div class="arrow">▶</div>
+        </button>
+      </div>
+      <div class="ai-row">
+        <button class="ai-btn" id="genBtn" onclick="generateMoreQuestions()">🤖 Ask AI for 5 fresh questions</button>
+      </div>
+      <div id="aiSlot"></div>
+    </div>
+  `;
+}
+
+/* ---------------- Quiz Blitz ---------------- */
+function startQuiz(){
+  const s = subjectById(state.subjectId);
+  state.quiz = {list: shuffle(allQuiz(s)), i:0, score:0, streak:0, timer:null, timeLeft:20, answered:false};
+  state.screen='quiz';
+  render();
+  startQuizTimer();
+}
+
+function quizScreen(){
+  const s = subjectById(state.subjectId);
+  const q = state.quiz.list[state.quiz.i];
+  if(!q){ finishQuiz(); return resultsScreen(); }
+  const pct = (state.quiz.timeLeft/20)*100;
+  return `
+    <div class="panel">
+      <div class="hud">
+        <span>Q${state.quiz.i+1}/${state.quiz.list.length}</span>
+        <span class="score">Score: ${state.quiz.score} · Streak: ${state.quiz.streak}</span>
+      </div>
+      <div class="timer-bar"><div class="timer-fill ${state.quiz.timeLeft<=7?'danger':''}" style="width:${pct}%"></div></div>
+      <div class="q-topic mono">${q.topic}</div>
+      <div class="q-text">${q.q}</div>
+      <div class="options" id="optWrap">
+        ${q.options.map((o,i)=>`<button class="option" onclick="answerQuiz(${i})">${o}</button>`).join('')}
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <div id="aiSlot"></div>
+      <div class="next-row" id="nextRow"></div>
+    </div>
+  `;
+}
+
+function startQuizTimer(){
+  clearInterval(state.quiz.timer);
+  state.quiz.timeLeft = 20;
+  state.quiz.timer = setInterval(()=>{
+    state.quiz.timeLeft--;
+    const bar = document.querySelector('#app .timer-fill');
+    const hud = document.querySelector('#app .hud');
+    if(bar){ bar.style.width = (state.quiz.timeLeft/20*100)+'%'; if(state.quiz.timeLeft<=7) bar.classList.add('danger'); }
+    if(state.quiz.timeLeft<=0){ clearInterval(state.quiz.timer); answerQuiz(-1); }
+  },1000);
+}
+
+function answerQuiz(choice){
+  if(state.quiz.answered) return;
+  state.quiz.answered = true;
+  clearInterval(state.quiz.timer);
+  const s = subjectById(state.subjectId);
+  const q = state.quiz.list[state.quiz.i];
+  const opts = document.querySelectorAll('#optWrap .option');
+  opts.forEach((btn,i)=>{
+    btn.disabled = true;
+    if(i===q.a) btn.classList.add('correct');
+    if(i===choice && choice!==q.a) btn.classList.add('wrong');
+  });
+  state.progress[s.id].attempted++;
+  const fb = document.getElementById('feedback');
+  if(choice===q.a){
+    state.quiz.score += 10 + state.quiz.streak*2;
+    state.quiz.streak++;
+    state.progress[s.id].correct++;
+    fb.textContent = choice===-1 ? '' : 'Nice — correct.';
+  } else {
+    state.quiz.streak = 0;
+    fb.textContent = choice===-1 ? 'Time\'s up.' : 'Not quite.';
+  }
+  document.getElementById('nextRow').innerHTML = `
+    <button class="btn" onclick="nextQuiz()">Next →</button>
+    <button class="btn ghost" onclick='explainQuestion(${JSON.stringify(q)})'>🤖 Explain this</button>
+  `;
+}
+
+function nextQuiz(){
+  state.quiz.i++;
+  state.quiz.answered = false;
+  if(state.quiz.i >= state.quiz.list.length){ finishQuiz(); render(); return; }
+  render();
+  startQuizTimer();
+}
+
+function finishQuiz(){
+  state.screen='results';
+  state._lastScore = state.quiz.score;
+  state._lastLine = `${state.quiz.list.filter((q,i)=>i<state.quiz.i).length} questions played`;
+}
+
+/* ---------------- Survival ---------------- */
+function startSurvival(){
+  const s = subjectById(state.subjectId);
+  state.survival = {list: shuffle(allQuiz(s)), i:0, lives:3, score:0, timer:null, timeLeft:14, answered:false};
+  state.screen='survival';
+  render();
+  startSurvivalTimer();
+}
+
+function survivalScreen(){
+  const q = state.survival.list[state.survival.i % state.survival.list.length];
+  const pct = (state.survival.timeLeft/14)*100;
+  return `
+    <div class="panel">
+      <div class="hud">
+        <span class="lives">${'♥'.repeat(state.survival.lives)}${'♡'.repeat(3-state.survival.lives)}</span>
+        <span class="score">Score: ${state.survival.score}</span>
+      </div>
+      <div class="timer-bar"><div class="timer-fill ${state.survival.timeLeft<=5?'danger':''}" style="width:${pct}%"></div></div>
+      <div class="q-topic mono">${q.topic}</div>
+      <div class="q-text">${q.q}</div>
+      <div class="options" id="optWrap">
+        ${q.options.map((o,i)=>`<button class="option" onclick="answerSurvival(${i})">${o}</button>`).join('')}
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <div class="next-row" id="nextRow"></div>
+    </div>
+  `;
+}
+
+function startSurvivalTimer(){
+  clearInterval(state.survival.timer);
+  const speed = Math.max(7, 14 - Math.floor(state.survival.i/3));
+  state.survival.timeLeft = speed;
+  state.survival.timer = setInterval(()=>{
+    state.survival.timeLeft--;
+    const bar = document.querySelector('#app .timer-fill');
+    if(bar){ bar.style.width = (state.survival.timeLeft/speed*100)+'%'; if(state.survival.timeLeft<=5) bar.classList.add('danger'); }
+    if(state.survival.timeLeft<=0){ clearInterval(state.survival.timer); answerSurvival(-1); }
+  },1000);
+}
+
+function answerSurvival(choice){
+  if(state.survival.answered) return;
+  state.survival.answered = true;
+  clearInterval(state.survival.timer);
+  const s = subjectById(state.subjectId);
+  const q = state.survival.list[state.survival.i % state.survival.list.length];
+  const opts = document.querySelectorAll('#optWrap .option');
+  opts.forEach((btn,i)=>{
+    btn.disabled = true;
+    if(i===q.a) btn.classList.add('correct');
+    if(i===choice && choice!==q.a) btn.classList.add('wrong');
+  });
+  state.progress[s.id].attempted++;
+  const fb = document.getElementById('feedback');
+  if(choice===q.a){
+    state.survival.score += 10;
+    state.progress[s.id].correct++;
+    fb.textContent = 'Correct — next one\'s a bit faster.';
+  } else {
+    state.survival.lives--;
+    fb.textContent = choice===-1 ? 'Time\'s up — lost a life.' : 'Wrong — lost a life.';
+  }
+  document.getElementById('nextRow').innerHTML = state.survival.lives<=0
+    ? `<button class="btn" onclick="finishSurvival()">See result →</button>`
+    : `<button class="btn" onclick="nextSurvival()">Next →</button>`;
+}
+
+function nextSurvival(){
+  state.survival.i++;
+  state.survival.answered = false;
+  render();
+  startSurvivalTimer();
+}
+
+function finishSurvival(){
+  state.screen='results';
+  state._lastScore = state.survival.score;
+  state._lastLine = `Survived ${state.survival.i+1} questions`;
+  render();
+}
+
+/* ---------------- Match-Up ---------------- */
+function startMatch(){
+  const s = subjectById(state.subjectId);
+  const pairs = s.pairs;
+  let cards = [];
+  pairs.forEach((p,idx)=>{
+    cards.push({id:idx+'-t', pairId:idx, text:p[0], solved:false});
+    cards.push({id:idx+'-d', pairId:idx, text:p[1], solved:false});
+  });
+  cards = shuffle(cards);
+  state.match = {cards, first:null, solvedCount:0, tries:0};
+  state.screen='match';
+  render();
+}
+
+function matchScreen(){
+  const s = subjectById(state.subjectId);
+  const cards = state.match.cards.map(c=>{
+    let cls = 'match-card';
+    if(c.solved) cls += ' solved';
+    else if(state.match.first && state.match.first.id===c.id) cls += ' flipped';
+    return `<button class="${cls}" onclick="flipCard('${c.id}')" ${c.solved?'disabled':''}>${c.text}</button>`;
+  }).join('');
+  return `
+    <div class="panel">
+      <div class="hud">
+        <span>Pairs solved: ${state.match.solvedCount}/${s.pairs.length}</span>
+        <span class="score">Attempts: ${state.match.tries}</span>
+      </div>
+      <div class="match-grid" id="matchGrid">${cards}</div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+  `;
+}
+
+function flipCard(id){
+  const card = state.match.cards.find(c=>c.id===id);
+  if(card.solved) return;
+  if(!state.match.first){
+    state.match.first = card;
+    render();
+    return;
+  }
+  if(state.match.first.id===id) return;
+  state.match.tries++;
+  if(state.match.first.pairId===card.pairId){
+    card.solved = true;
+    state.match.cards.find(c=>c.id===state.match.first.id).solved = true;
+    state.match.solvedCount++;
+    state.match.first = null;
+    render();
+    const s = subjectById(state.subjectId);
+    if(state.match.solvedCount===s.pairs.length){
+      state.screen='results';
+      state._lastScore = null;
+      state._lastLine = `Matched all ${s.pairs.length} pairs in ${state.match.tries} attempts`;
+      render();
+    }
+  } else {
+    const firstId = state.match.first.id;
+    render();
+    document.getElementById(matchGridSelector(firstId));
+    const els = document.querySelectorAll('.match-card');
+    els.forEach(el=>{
+      if(el.textContent.trim()===state.match.first.text || el.textContent.trim()===card.text) el.classList.add('shake');
+    });
+    setTimeout(()=>{ state.match.first = null; render(); }, 700);
+  }
+}
+function matchGridSelector(){ return 'matchGrid'; }
+
+/* ---------------- Results ---------------- */
+function resultsScreen(){
+  return `
+    <div class="panel results">
+      <div class="big mono">${state._lastScore!==null && state._lastScore!==undefined ? state._lastScore : '✓'}</div>
+      <div class="sub">${state._lastLine||''}</div>
+      <div class="next-row" style="justify-content:center;margin-top:18px;">
+        <button class="btn" onclick="openSubject('${state.subjectId}')">Play again</button>
+        <button class="btn ghost" onclick="goHome()">Back to board</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+function goHome(){ state.screen='home'; render(); }
+function openSubject(id){ state.subjectId=id; state.screen='mode'; render(); }
+
+render();
+/* ============================================================
+   AI HELPERS — calls Claude through your Cloudflare Worker proxy
+   Paste your Worker URL below (looks like:
+   https://revision-board-proxy.YOUR-SUBDOMAIN.workers.dev)
+   ============================================================ */
+const AI_PROXY_URL = "revision-website.l-lewisgordon.workers.dev";
+
+async function callClaude(prompt){
+  if(AI_PROXY_URL.includes('PASTE_YOUR_WORKER_URL_HERE')){
+    throw new Error('no-proxy-set');
+  }
+  const res = await fetch(AI_PROXY_URL, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      messages:[{role:"user", content: prompt}]
+    })
+  });
+  const data = await res.json();
+  const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+  return text;
+}
+
+async function explainQuestion(q){
+  const slot = document.getElementById('aiSlot');
+  slot.innerHTML = `<div class="ai-box"><span class="tag mono">AI EXPLAIN</span><span class="spinner"></span>thinking…</div>`;
+  try{
+    const s = subjectById(state.subjectId);
+    const prompt = `You're explaining a GCSE ${s.name} question to a 15 year old student called Lewis who's dyslexic and wants things kept short and plain, no waffle. Question: "${q.q}" Options: ${q.options.join(', ')}. Correct answer: "${q.options[q.a]}". Explain in 2-3 short sentences why that's correct, in plain simple words, no headers, no bullet points, just a short paragraph.`;
+    const text = await callClaude(prompt);
+    slot.innerHTML = `<div class="ai-box"><span class="tag mono">AI EXPLAIN</span>${text||'No explanation came back — try again.'}</div>`;
+  }catch(e){
+    slot.innerHTML = e.message==='no-proxy-set'
+      ? `<div class="ai-box"><span class="tag mono">AI EXPLAIN</span>Set your Worker URL in the code (AI_PROXY_URL) to turn this on.</div>`
+      : `<div class="ai-box"><span class="tag mono">AI EXPLAIN</span>Couldn't reach the AI helper just now. Try again in a bit.</div>`;
+  }
+}
+
+async function generateMoreQuestions(){
+  const btn = document.getElementById('genBtn');
+  const slot = document.getElementById('aiSlot');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  slot.innerHTML = `<div class="ai-box"><span class="tag mono">AI GENERATE</span><span class="spinner"></span>writing 5 new questions…</div>`;
+  const s = subjectById(state.subjectId);
+  try{
+    const prompt = `Write 5 new GCSE ${s.name} (${s.board} spec) multiple choice revision questions, different from typical textbook filler, covering a mix of the usual topics for this subject. Return ONLY valid JSON, no markdown fences, no preamble, in this exact shape: [{"q":"question text","options":["a","b","c","d"],"a":0,"topic":"short topic label"}]. The "a" field is the index (0-3) of the correct option. Keep questions short and exam-realistic, plain English.`;
+    const text = await callClaude(prompt);
+    const clean = text.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    if(!Array.isArray(parsed) || !parsed.length) throw new Error('bad shape');
+    if(!state.extraQuestions[s.id]) state.extraQuestions[s.id] = [];
+    state.extraQuestions[s.id] = state.extraQuestions[s.id].concat(parsed);
+    slot.innerHTML = `<div class="ai-box"><span class="tag mono">AI GENERATE</span>Added ${parsed.length} new questions to this subject's pool for this session.</div>`;
+  }catch(e){
+    slot.innerHTML = e.message==='no-proxy-set'
+      ? `<div class="ai-box"><span class="tag mono">AI GENERATE</span>Set your Worker URL in the code (AI_PROXY_URL) to turn this on.</div>`
+      : `<div class="ai-box"><span class="tag mono">AI GENERATE</span>Couldn't generate new questions right now. Try again.</div>`;
+  }
+  btn.disabled = false;
+  btn.textContent = '🤖 Ask AI for 5 fresh questions';
+}
+
+</script>
+</body>
+</html>
